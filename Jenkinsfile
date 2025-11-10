@@ -2,7 +2,6 @@ pipeline {
     agent any
     environment {
         IMAGE = 'junaidh1331/my-node-app'
-        DOCKER_CREDS = credentials('docker-hub-creds')
         DEPLOY_DIR = 'C:/blue-green-deploy'
     }
     parameters {
@@ -11,16 +10,16 @@ pipeline {
     }
     stages {
         stage('Build & Push') {
-    steps {
-        script {
-            bat "docker build -t ${IMAGE}:${params.VERSION} ."
-            withCredentials([usernamePassword(credentialsId: 'docker-pas', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                bat "echo %PASS% | docker login -u %USER% --password-stdin"
-                bat "docker push ${IMAGE}:${params.VERSION}"
+            steps {
+                script {
+                    bat "docker build -t ${IMAGE}:${params.VERSION} ."
+                    withCredentials([usernamePassword(credentialsId: 'docker-pass', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                        bat "echo %PASS% | docker login -u %USER% --password-stdin"
+                        bat "docker push ${IMAGE}:${params.VERSION}"
+                    }
+                }
             }
         }
-    }
-}
         stage('Deploy to Target') {
             steps {
                 script {
@@ -58,7 +57,9 @@ pipeline {
     post {
         failure {
             echo "Deployment failed! Rolling back..."
-            // Optional: switch back to old env
+        }
+        success {
+            echo "v${params.VERSION} deployed successfully to ${params.TARGET_ENV}!"
         }
     }
 }
