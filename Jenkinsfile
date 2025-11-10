@@ -1,26 +1,26 @@
 pipeline {
-    agent any
+    agent {
+        label 'windows && docker'
+    }
     environment {
         IMAGE = 'junaidh1331/my-node-app'
-        DEPLOY_DIR = 'C:/blue-green-deploy'
+        DEPLOY_DIR = 'C:\\blue-green-deploy'
     }
     parameters {
-        string(name: 'VERSION', defaultValue: 'v2', description: 'Docker image tag')
-        choice(name: 'TARGET_ENV', choices: ['green', 'blue'], description: 'Deploy to inactive env')
+        string(name: 'VERSION', defaultValue: 'v2')
+        choice(name: 'TARGET_ENV', choices: ['green', 'blue'])
     }
     stages {
         stage('Build & Push') {
             steps {
-                script {
-                    bat "docker build -t ${IMAGE}:${params.VERSION} ."
-                    withCredentials([usernamePassword(credentialsId: 'docker-pass', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                        bat "echo %PASS% | docker login -u %USER% --password-stdin"
-                        bat "docker push ${IMAGE}:${params.VERSION}"
-                    }
+                bat "docker build -t ${IMAGE}:${params.VERSION} ."
+                withCredentials([usernamePassword(credentialsId: 'docker-pas', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    bat "echo %PASS% | docker login -u %USER% --password-stdin"
+                    bat "docker push ${IMAGE}:${params.VERSION}"
                 }
             }
         }
-        stage('Deploy to Target') {
+        stage('Deploy') {
             steps {
                 script {
                     def port = params.TARGET_ENV == 'blue' ? '3001' : '3002'
@@ -37,11 +37,10 @@ pipeline {
                 script {
                     def port = params.TARGET_ENV == 'blue' ? '3001' : '3002'
                     bat "curl -f http://localhost:${port} || exit 1"
-                    echo "${params.TARGET_ENV} is healthy!"
                 }
             }
         }
-        stage('Switch Traffic') {
+        stage('Switch') {
             steps {
                 script {
                     def target = params.TARGET_ENV == 'blue' ? 'blue:3000' : 'green:3000'
@@ -49,17 +48,11 @@ pipeline {
                         powershell -Command "(Get-Content ${DEPLOY_DIR}\\nginx.conf) -replace 'server .*;', 'server ${target};' | Set-Content ${DEPLOY_DIR}\\nginx.conf"
                         docker restart nginx
                     """
-                    echo "Traffic switched to ${params.TARGET_ENV} (${params.VERSION})"
                 }
             }
         }
     }
     post {
-        failure {
-            echo "Deployment failed! Rolling back..."
-        }
-        success {
-            echo "v${params.VERSION} deployed successfully to ${params.TARGET_ENV}!"
-        }
+        success { echo "Deployed v${params.VERSION} → ${params.TARGET_ENV} (Zero Downtime!)" }
     }
 }
