@@ -11,14 +11,16 @@ pipeline {
     }
     stages {
         stage('Build & Push') {
-            steps {
-                script {
-                    bat "docker build -t ${IMAGE}:${params.VERSION} ."
-                    bat "echo ${DOCKER_CREDS_PSW} | docker login -u ${DOCKER_CREDS_USR} --password-stdin"
-                    bat "docker push ${IMAGE}:${params.VERSION}"
-                }
+    steps {
+        script {
+            bat "docker build -t ${IMAGE}:${params.VERSION} ."
+            withCredentials([usernamePassword(credentialsId: 'docker-pas', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                bat "echo %PASS% | docker login -u %USER% --password-stdin"
+                bat "docker push ${IMAGE}:${params.VERSION}"
             }
         }
+    }
+}
         stage('Deploy to Target') {
             steps {
                 script {
